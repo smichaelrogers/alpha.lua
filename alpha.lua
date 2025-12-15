@@ -140,6 +140,7 @@ local SQ120 = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 }
+
 -- util
 local function dump(o)
    if type(o) == 'table' then
@@ -168,7 +169,7 @@ local otherSide
 local result
 
 
-local function printBoard()
+local function renderBoard()
   local board = ''
   for i = 1, 64 do
     if (i - 1) % 8 == 0 then
@@ -180,7 +181,7 @@ local function printBoard()
       board = board .. UNICODE[colors[i]][pieces[i]] .. " "
     end
   end
-  print(board)
+  return board
 end
 
 local function createMove(from, to, piece, target)
@@ -288,7 +289,6 @@ local function makeMove(move)
     return false
   end
   swapSides()
-  printBoard()
   return true
 end
 
@@ -307,19 +307,19 @@ local function generateMoves()
         end
         if colors[to] == EMPTY then
           to = to + FORWARD[currentSide]
-          if colors[to] == EMPTY and from >> 3 == PAWN_RANK[currentSide] then
+          if colors[to] == EMPTY and (((from - 1) >> 3) + 1) == PAWN_RANK[currentSide] then
             addMove(from, to)
           end
         end
       else
-        for i = 1, #STEPS[pieces[from]] do
-          step = STEPS[pieces[from]][i]
+        for stepIndex = 1, #STEPS[pieces[from]] do
+          step = STEPS[pieces[from]][stepIndex]
           to = SQ120[SQ64[from] + step]
           while to ~= NULL do
             if colors[to] ~= currentSide then
               addMove(from, to)
             end
-            if not colors[to] == EMPTY and SLIDES[pieces[from]] then
+            if colors[to] ~= EMPTY and SLIDES[pieces[from]] then
               break
             end
             to = SQ120[SQ64[to] + step]
@@ -330,6 +330,13 @@ local function generateMoves()
   end
 end
 
+function sleep(n) -- n is the number of seconds
+    local t0 = os.clock()
+    while os.clock() - t0 <= n do
+        -- do nothing
+    end
+end
+
 local function alphaBeta(alpha, beta, depth)
   if depth == 0 then
     return evaluate()
@@ -337,18 +344,22 @@ local function alphaBeta(alpha, beta, depth)
   nodes[ply] = nodes[ply] + 1
   generateMoves()
   for i = 1, #moves[ply] do
-    local m = moves[ply][i]
-    local moveMade = makeMove(m)
+    local move = moves[ply][i]
+    local moveMade = makeMove(move)
     if moveMade then
+      print(renderBoard())
+      sleep(0.3)
       local x = -alphaBeta(-beta, -alpha, depth - 1)
-      unmakeMove(m)
+      print(renderBoard())
+      sleep(0.3)
+      unmakeMove(move)
       if x > alpha then
         if x >= beta then
           return beta
         end
         alpha = x
         if ply == ROOT_PLY then
-          rootMove = createMove(m.from, m.to, m.piece, m.target)
+          rootMove = createMove(move.from, move.to, move.piece, move.target)
         end
       end
     end
@@ -401,19 +412,19 @@ local function generateFEN()
         empty = empty + 1
         if x == 8 then
           row = row .. empty
-        else
-          if empty > 0 then
-            row = row .. empty
-          end
-          empty = 0
-          row = row .. PIECES[colors[i]][pieces[i]]
         end
+      else
+        if empty > 0 then
+          row = row .. empty
+        end
+        empty = 0
+        row = row .. PIECES[colors[i]][pieces[i]]
       end
     end
     table.insert(rows, row)
   end
   local position = table.concat(rows, '/')
-  return position .. COLORS[currentSide] .. ' - - 0 ' .. turn
+  return position .. COLORS[currentSide] .. ' - - 0 ' .. turnNumber
 end
 
 local function serializeMove(move)
@@ -441,32 +452,40 @@ local function reset()
 end
 
 
-local function run(fen, height)
+local function run(fen, searchHeight)
   if not fen then
     fen = FEN_INITIAL
   end
   reset()
   parseFEN(fen)
   local startTime = os.clock()
-  alphaBeta(-INFINITY, INFINITY, height)
+  alphaBeta(-INFINITY, INFINITY, searchHeight)
   if not rootMove then
-    return nil
-  end
-  local totalNodes = 0
-  for i = 1, height + 1 do
+    result = nil
+  else
+    local totalNodes = 0
+  for i = 1, MAX_PLY do
     totalNodes = totalNodes + nodes[i]
   end
   local searchClock = os.clock() - startTime
   local e = evaluate()
   makeMove(rootMove)
+  turnNumber = turnNumber + 1
   local c = inCheck()
-  return {
+  local unicodeBoard = renderBoard()
+  result = {
     fen = generateFEN(),
     move = serializeMove(rootMove),
     score = e - evaluate(),
     timeElapsed = searchClock,
     nodes = totalNodes,
+    turnNumber = turnNumber,
+    check = c,
+    unicodeBoard = unicodeBoard,
   }
+  end
+  return result
 end
 
-run(FEN_INITIAL, 5)
+local _result = run(FEN_INITIAL, 3)
+print(dump(_result))
