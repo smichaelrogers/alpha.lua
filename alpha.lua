@@ -4,12 +4,15 @@ local INFINITY = 100000000
 local WHITE, BLACK = 1, 2
 local NULL = -1
 local EMPTY = 7
+
 local PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 local P, N, B, R, Q, K = PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+
 local FORWARD = {-8, 8}
 local PAWN_RANK = {8, 1}
 local PIECE_RANK = {7, 2}
 local PROMOTION_RANK = {1, 8}
+
 local STEPS = {}
 STEPS[P] = {}
 STEPS[N] = {-21, -19, -12, -8, 8, 12, 19, 21}
@@ -17,6 +20,7 @@ STEPS[B] = {11, -11, -9, 9}
 STEPS[R] = {1, 10, -1, -10}
 STEPS[Q] = {-9, 9, -11, 11, -10, 10, -1, 1}
 STEPS[K] = {-9, 9, -11, 11, -10, 10, -1, 1}
+
 local SLIDES = {}
 SLIDES[P] = false
 SLIDES[N] = false
@@ -24,6 +28,7 @@ SLIDES[B] = true
 SLIDES[R] = true
 SLIDES[Q] = true
 SLIDES[K] = false
+
 local MATERIAL = {}
 MATERIAL[P] = 1
 MATERIAL[N] = 3
@@ -89,6 +94,8 @@ local FEN_MATCH = {
   ['7'] = '_______',
   ['8'] = '________'
 }
+local FEN_INITIAL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+local FEN_EMPTY = '8/8/8/8/8/8/8/8 w KQkq - 0 1'
 local PST = {
   -40,-30,-20,-10,-10,-20,-30,-40,
 	-30,-15, -5,  0,  0, -5,-15,-30,
@@ -100,51 +107,81 @@ local PST = {
 	-40,-30,-20,-10,-10,-20,-30,-40
 }
 local SQ = {
-   0,  1,  2,  3,  4,  5,  6,  7,
-	 8,  9, 10, 11, 12, 13, 14, 15,
-	16, 17, 18, 19, 20, 21, 22, 23,
-	24, 25, 26, 27, 28, 29, 30, 31,
-	32, 33, 34, 35, 36, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47,
-	48, 49, 50, 51, 52, 53, 54, 55,
-	56, 57, 58, 59, 60, 61, 62, 63
+   1,  2,  3,  4,  5,  6,  7,  8,
+	 9, 10, 11, 12, 13, 14, 15, 16,
+	17, 18, 19, 20, 21, 22, 23, 24,
+	25, 26, 27, 28, 29, 30, 31, 32,
+	33, 34, 35, 36, 37, 38, 39, 40,
+	41, 42, 43, 44, 45, 46, 47, 48,
+	49, 50, 51, 52, 53, 54, 55, 56,
+	57, 58, 59, 60, 61, 62, 63, 64
 }
 local SQ64 = {
-  21, 22, 23, 24, 25, 26, 27, 28,
-	31, 32, 33, 34, 35, 36, 37, 38,
-	41, 42, 43, 44, 45, 46, 47, 48,
-	51, 52, 53, 54, 55, 56, 57, 58,
-	61, 62, 63, 64, 65, 66, 67, 68,
-	71, 72, 73, 74, 75, 76, 77, 78,
-	81, 82, 83, 84, 85, 86, 87, 88,
-	91, 92, 93, 94, 95, 96, 97, 98
+  22, 23, 24, 25, 26, 27, 28, 29,
+	32, 33, 34, 35, 36, 37, 38, 39,
+	42, 43, 44, 45, 46, 47, 48, 49,
+	52, 53, 54, 55, 56, 57, 58, 59,
+	62, 63, 64, 65, 66, 67, 68, 69,
+	72, 73, 74, 75, 76, 77, 78, 79,
+	82, 83, 84, 85, 86, 87, 88, 89,
+	92, 93, 94, 95, 96, 97, 98, 99
 }
 local SQ120 = {
   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1,  0,  1,  2,  3,  4,  5,  6,  7, -1,
-	-1,  8,  9, 10, 11, 12, 13, 14, 15, -1,
-	-1, 16, 17, 18, 19, 20, 21, 22, 23, -1,
-	-1, 24, 25, 26, 27, 28, 29, 30, 31, -1,
-	-1, 32, 33, 34, 35, 36, 37, 38, 39, -1,
-	-1, 40, 41, 42, 43, 44, 45, 46, 47, -1,
-	-1, 48, 49, 50, 51, 52, 53, 54, 55, -1,
-	-1, 56, 57, 58, 59, 60, 61, 62, 63, -1,
+	-1,  1,  2,  3,  4,  5,  6,  7,  8, -1,
+	-1,  9, 10, 11, 12, 13, 14, 15, 16, -1,
+	-1, 17, 18, 19, 20, 21, 22, 23, 24, -1,
+	-1, 25, 26, 27, 28, 29, 30, 31, 32, -1,
+	-1, 33, 34, 35, 36, 37, 38, 39, 40, -1,
+	-1, 41, 42, 43, 44, 45, 46, 47, 48, -1,
+	-1, 49, 50, 51, 52, 53, 54, 55, 56, -1,
+	-1, 57, 58, 59, 60, 61, 62, 63, 64, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 }
-local FEN_INITIAL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-local FEN_EMPTY = '8/8/8/8/8/8/8/8 w KQkq - 0 1'
+-- util
+local function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+
+-- non const globals
 local pieces
 local colors
 local kings
 local moves
 local nodes
-local turn
+local turnNumber
 local ply
-local move
+local rootMove
 local currentSide
 local otherSide
+local result
+
+
+local function printBoard()
+  local board = ''
+  for i = 1, 64 do
+    if (i - 1) % 8 == 0 then
+      board = board .. "\n"
+    end
+    if colors[i] == EMPTY then
+      board = board .. "_ "
+    else
+      board = board .. UNICODE[colors[i]][pieces[i]] .. " "
+    end
+  end
+  print(board)
+end
 
 local function createMove(from, to, piece, target)
   return {
@@ -171,6 +208,7 @@ local function inCheck()
   local to, step
   local from = kings[currentSide]
   for i = 1, 8 do
+    -- debug.debug()
     to = SQ120[SQ64[from] + STEPS[KNIGHT][i]]
     if to ~= NULL and pieces[to] == KNIGHT and colors[to] == otherSide then
       return true
@@ -250,6 +288,7 @@ local function makeMove(move)
     return false
   end
   swapSides()
+  printBoard()
   return true
 end
 
@@ -297,7 +336,7 @@ local function alphaBeta(alpha, beta, depth)
   end
   nodes[ply] = nodes[ply] + 1
   generateMoves()
-  for i = 1, moves[ply] do
+  for i = 1, #moves[ply] do
     local m = moves[ply][i]
     local moveMade = makeMove(m)
     if moveMade then
@@ -309,25 +348,12 @@ local function alphaBeta(alpha, beta, depth)
         end
         alpha = x
         if ply == ROOT_PLY then
-          move = createMove(m.from, m.to, m.piece, m.target)
+          rootMove = createMove(m.from, m.to, m.piece, m.target)
         end
       end
     end
   end
   return alpha
-end
-
-local function dump(o)
-   if type(o) == 'table' then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
-      end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
 end
 
 local function parseFEN(fen)
@@ -340,7 +366,7 @@ local function parseFEN(fen)
   else
     currentSide, otherSide = WHITE, BLACK
   end
-  turn = tonumber(tokens[6])
+  turnNumber = tonumber(tokens[6])
   local board = {}
   local boardString = ''
   local position = tokens[1]
@@ -358,6 +384,9 @@ local function parseFEN(fen)
   for i = 1, 64 do
     colors[i] = board[i].color
     pieces[i] = board[i].piece
+    if pieces[i] == KING then
+      kings[colors[i]] = i
+    end
   end
 end
 
@@ -391,14 +420,6 @@ local function serializeMove(move)
   return dump(move)
 end
 
-local function serializeSearch()
-  return dump({
-    height = height,
-    clock = clock,
-    nodes = nodes,
-  })
-end
-
 local function reset()
   pieces = {}
   colors = {}
@@ -406,7 +427,8 @@ local function reset()
   moves = {}
   nodes = {}
   ply = 1
-  move = nil
+  turnNumber = 1
+  rootMove = nil
   result = nil
   for i = 1, 64 do
     pieces[i] = EMPTY
@@ -418,6 +440,7 @@ local function reset()
   end
 end
 
+
 local function run(fen, height)
   if not fen then
     fen = FEN_INITIAL
@@ -426,18 +449,23 @@ local function run(fen, height)
   parseFEN(fen)
   local startTime = os.clock()
   alphaBeta(-INFINITY, INFINITY, height)
-  if not move then
+  if not rootMove then
     return nil
   end
-  clock = os.clock() - startTime
+  local totalNodes = 0
+  for i = 1, height + 1 do
+    totalNodes = totalNodes + nodes[i]
+  end
+  local searchClock = os.clock() - startTime
   local e = evaluate()
-  makeMove(move)
+  makeMove(rootMove)
   local c = inCheck()
   return {
     fen = generateFEN(),
-    move = serializeMove(move),
-    search = serializeSearch(),
+    move = serializeMove(rootMove),
     score = e - evaluate(),
+    timeElapsed = searchClock,
+    nodes = totalNodes,
   }
 end
 
